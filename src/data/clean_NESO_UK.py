@@ -65,6 +65,35 @@ print("Time gaps detected between consecutive datetimes:")
 print(gaps)
 
 
+# Check for outliers in the National Demand
+
+Q1 = df['I014_ND'].quantile(0.25)   # Compute the 25th percentile 
+Q3 = df['I014_ND'].quantile(0.75)   # Compute the 75th percentile 
+
+# Compute the interquartile range
+IQR = Q3 - Q1
+
+# Define the lower and upper bounds for outliers (1.5 * IQR below Q1) and (1.5 * IQR above Q3)
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+# Create a boolean mask marking True for values outside the [lower, upper] range
+outlier_mask = (df['I014_ND'] < lower) | (df['I014_ND'] > upper)
+
+# Print the computed outlier thresholds
+print("Upper bound:", upper)
+print("Lower bound:", lower)
+
+# Print the total number of outliers detected
+print("Number of outliers:", outlier_mask.sum())
+
+# Display the National Demand values flagged as outliers
+print(df.loc[outlier_mask, 'I014_ND'].head(15))
+
+
+
+#df['I014_ND'] = df['I014_ND'].clip(lower, upper)
+
 print(f"\n Cleaning complete. Total rows: {len(df)} | Interpolated: {df['is_interpolated'].sum()}")
 
 # Export the cleaned and indexed DataFrame to a CSV file
