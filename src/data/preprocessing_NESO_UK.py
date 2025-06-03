@@ -45,16 +45,6 @@ df['month_cos'] = np.round(df['month_cos'], 14)    # Rounding to get exact zeros
 # Drop hour, month and weekday 
 df.drop(columns=['weekday', 'month', 'hour'], inplace=True)
 
-# Standard scaling of features
-features = ['NON_BM_STOR','I014_PUMP_STORAGE_PUMPING','I014_ND_lag_1','I014_ND_lag_2',
-            'I014_ND_lag_48','I014_ND_lag_96','I014_ND_lag_336','I014_ND_mean_48',
-            'I014_ND_mean_336','net_import','wind_capacity_factor','solar_capacity_factor'
-]
-
-scaler = StandardScaler()   # z-score normalization
-
-# Fit the scaler on the selected numeric features and transform them
-df[features] = scaler.fit_transform(df[features])
 
 df.to_csv('D:/Data science/energy-forecasting-ml/data/processed/NESO_UK/preprocessed_new_features_cleaned_DemandData_2011-2018.csv')
 
