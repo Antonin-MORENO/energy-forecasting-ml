@@ -7,7 +7,7 @@ df = pd.read_csv(
     index_col='datetime'
 )
 
-# Add calendar features ===
+# Add calendar features 
 df['hour'] = df.index.hour                # Hour of the day (0–23)
 df['weekday'] = df.index.weekday          # Day of the week (0=Monday, ..., 6=Sunday)
 df['month'] = df.index.month              # Month of the year (1–12)
@@ -33,6 +33,8 @@ df['net_import'] = df[['I014_FRENCH_FLOW', 'I014_BRITNED_FLOW', 'I014_MOYLE_FLOW
 df['wind_capacity_factor'] = df['EMBEDDED_WIND_GENERATION'] / df['EMBEDDED_WIND_CAPACITY']
 df['solar_capacity_factor'] = df['EMBEDDED_SOLAR_GENERATION'] / df['EMBEDDED_SOLAR_CAPACITY']
 
+# Drop NaN values induced by lags
+df.dropna(inplace=True)
 
 
 # Export the enriched dataset with new features 
