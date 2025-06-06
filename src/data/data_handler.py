@@ -13,12 +13,14 @@ class DataHandler:
                  feature_cols: list,
                  target_col: str,
                  holdout_ratio: float = 0.1,
+                 holdout_years: int = None,
                  scaler_type: str = 'standard'):
         self.csv_path = csv_path
         self.date_col = date_col
         self.feature_cols = feature_cols
         self.target_col = target_col
         self.holdout_ratio = holdout_ratio
+        self.holdout_years  = holdout_years
         self.scaler_type = scaler_type
         self.scaler = None
 
@@ -37,11 +39,25 @@ class DataHandler:
 
     def temporal_split(self, df: pd.DataFrame):
         """
-        Simple temporal split:
-          - keep the last self.holdout_ratio % of rows for the final test set
-          - use the rest for training/validation
+        Temporal split of the dataset:
+        - If holdout_years is specified, keep the last N years for the test set
+        - Otherwise, keep the last self.holdout_ratio % of rows for the final test set
+        - Use the remaining rows for training/validation
         Returns (df_trainval, df_test), both with the date_col still present.
         """
+        
+        # Split by years
+        if self.holdout_years is not None:
+            # Find the maximum date, then subtract N years to get the cutoff
+            max_date = df[self.date_col].max()
+            cutoff   = max_date - pd.DateOffset(years=self.holdout_years)
+
+
+            df_trainval = df[df[self.date_col] < cutoff].copy().reset_index(drop=True)  # All rows with date < cutoff
+            df_test     = df[df[self.date_col] >= cutoff].copy().reset_index(drop=True) #  All rows ≥ cutoff 
+            return df_trainval, df_test
+        
+        # Split by percentage 
         n_total = len(df)
         n_holdout = int(self.holdout_ratio * n_total)
         n_trainval = n_total - n_holdout
