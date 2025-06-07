@@ -1,23 +1,31 @@
 
 from sklearn.neighbors import KNeighborsRegressor
 from src.models.base_model import BaseModel
+from sklearn.base import BaseEstimator, RegressorMixin
 
-class KNNModel(BaseModel):
+
+
+
+class KNNModel(BaseModel, BaseEstimator, RegressorMixin):
     """
     Wrapper around sklearn.neighbors.KNeighborsRegressor.
     Implements build_model, fit, predict.
     Serialization (save/load) is not implemented here.
     """
 
-    def __init__(self, params: dict):
+    def __init__(self, params: dict = None, **kwargs):
         """
-        params expected (examples):
-          - "n_neighbors" (int)
-          - "weights" (str, e.g. "uniform" or "distance")
-          - "algorithm" (str, e.g. "auto", "ball_tree", "kd_tree", "brute")
-          - "leaf_size" (int)
-          - "p" (int: 1 for Manhattan, 2 for Euclidean, etc.)
+        Initialize the model by merging a dictionary of parameters with any provided keyword args.
+
+        Args:
+            params (dict, optional): Initial parameter dictionary.
+            **kwargs: Named parameters passed by sklearn.clone().
         """
+        
+        if params is None:
+            params = {}
+
+        params.update(kwargs)
         super().__init__(params)
         self.model = None
         self.build_model()
@@ -53,6 +61,24 @@ class KNNModel(BaseModel):
         Return a 1D array of predictions from the trained KNN.
         """
         return self.model.predict(X)
+    
+    
+    
+    def get_params(self, deep=True):
+        """
+        Return hyperparameters for GridSearchCV and clone().
+        """
+        return self.params.copy()
+
+    def set_params(self, **new_params):
+        """
+        Update hyperparameters, rebuild the model, and return self.
+        Returns:
+            self: Enables method chaining.
+        """
+        self.params.update(new_params)
+        self.build_model()
+        return self
 
     def save(self, path: str):
         """
