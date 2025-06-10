@@ -12,6 +12,7 @@ class DataHandler:
                  date_col: str,
                  feature_cols: list,
                  target_col: str,
+                 no_scale_cols: list = None,
                  holdout_ratio: float = 0.1,
                  holdout_years: int = None,
                  scaler_type: str = 'standard'):
@@ -19,6 +20,7 @@ class DataHandler:
         self.date_col = date_col
         self.feature_cols = feature_cols
         self.target_col = target_col
+        self.no_scale_cols = no_scale_cols
         self.holdout_ratio = holdout_ratio
         self.holdout_years  = holdout_years
         self.scaler_type = scaler_type
@@ -70,15 +72,23 @@ class DataHandler:
                     df_trainval: pd.DataFrame,
                     df_test: pd.DataFrame):
         """
-        Scale the feature columns (only on trainval), then apply the same transform to the test set.
+        Scale a subset of feature columns (only on trainval), then apply the same transform
+        to the test set, while keeping other features untouched.
         Returns numpy arrays: (X_trainval, y_trainval, X_test, y_test).
         """
-        # Extract feature and target values
-        X_trval = df_trainval[self.feature_cols].values
-        y_trval = df_trainval[self.target_col].values
-        X_test  = df_test[self.feature_cols].values
-        y_test  = df_test[self.target_col].values
+        # Identify columns to scale by excluding those in no_scale_cols
+        cols_to_scale = [col for col in self.feature_cols if col not in self.no_scale_cols]
 
+        # Extract target data (unchanged)
+        y_trval = df_trainval[self.target_col].values
+        y_test = df_test[self.target_col].values
+
+        
+        # Prepare the complete feature DataFrames
+        X_trval_df = df_trainval[self.feature_cols].copy()
+        X_test_df = df_test[self.feature_cols].copy()
+        
+        
         # Choose the scaler type
         if self.scaler_type == 'standard':
             self.scaler = StandardScaler()
@@ -89,10 +99,11 @@ class DataHandler:
 
         # Fit the scaler on trainval, then transform both trainval and test
         if self.scaler is not None:
-            X_trval = self.scaler.fit_transform(X_trval)
-            X_test  = self.scaler.transform(X_test)
-
-        return X_trval, y_trval, X_test, y_test
+            X_trval_df[cols_to_scale] = self.scaler.fit_transform(X_trval_df[cols_to_scale])
+            X_test_df[cols_to_scale] = self.scaler.transform(X_test_df[cols_to_scale])
+            
+            
+        return X_trval_df.values, y_trval, X_test_df.values, y_test
 
     def get_time_series_cv(self, n_splits: int = 5):
         """
