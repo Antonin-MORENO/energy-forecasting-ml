@@ -19,12 +19,13 @@ os.makedirs(exp_metrics, exist_ok=True)
 # Define data paths and features
 csv_path     = 'data/processed/NESO_UK/preprocessed_new_features_cleaned_DemandData_2011-2018.csv'
 date_col     = 'datetime'
-feature_cols = [
-    'NON_BM_STOR','I014_PUMP_STORAGE_PUMPING','I014_ND_lag_1','I014_ND_lag_2',
-    'I014_ND_lag_48','I014_ND_lag_96','I014_ND_lag_336','I014_ND_mean_48',
-    'I014_ND_mean_336','net_import','wind_capacity_factor','solar_capacity_factor'
+feature_cols = ['NON_BM_STOR','I014_PUMP_STORAGE_PUMPING','is_interpolated','is_weekend',
+                'I014_ND_lag_1','I014_ND_lag_2','I014_ND_lag_48','I014_ND_lag_96','I014_ND_lag_336',
+                'I014_ND_mean_48','I014_ND_mean_336','net_import','wind_capacity_factor',
+                'solar_capacity_factor','hour_sin','hour_cos','weekday_sin','weekday_cos','month_sin','month_cos'
 ]
 target_col   = 'I014_ND'
+no_scale_cols = ['is_interpolated','is_weekend','hour_sin','hour_cos','weekday_sin','weekday_cos','month_sin','month_cos']
 
 # Load and split the data, holding out the last full year as test
 dh = DataHandler(
@@ -32,6 +33,7 @@ dh = DataHandler(
     date_col      = date_col,
     feature_cols  = feature_cols,
     target_col    = target_col,
+    no_scale_cols = no_scale_cols,
     holdout_ratio = None,
     holdout_years = 1,            # hold out the last full year
     scaler_type   = 'standard'
