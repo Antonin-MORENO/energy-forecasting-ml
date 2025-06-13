@@ -25,6 +25,16 @@ class DataHandler:
         self.holdout_years  = holdout_years
         self.scaler_type = scaler_type
         self.scaler = None
+        
+        # Identify and sort all lag feature columns (e.g., "I014_ND_lag_X)
+        self.lag_cols = sorted(
+            [c for c in self.feature_cols if c.startswith(f"{self.target_col}_lag_")],
+            key=lambda x: int(x.split('_')[-1])
+        )
+        
+        # All remaining feature columns are treated as static (non-lagged) inputs
+        self.stat_cols = [c for c in self.feature_cols if c not in self.lag_cols]
+
 
     def load_data(self):
         """
@@ -110,3 +120,62 @@ class DataHandler:
         Create and return a TimeSeriesSplit object with n_splits folds.
         """
         return TimeSeriesSplit(n_splits=n_splits)
+    
+    
+    def create_sequences(self, df: pd.DataFrame):
+        """
+        Build sequence and static inputs and target for sequence models:
+        - X_seq: (n_samples, timesteps, 1)
+        - X_stat: (n_samples, n_static) or None
+        - y:      (n_samples,)
+        """
+        # Extract lagged features as a 2D array (n_samples, timesteps)
+        X_lags = df[self.lag_cols].values
+        
+        # Determine the number of samples and the sequence length
+        n_samples, timesteps = X_lags.shape
+        
+        # Reshape into a 3D tensor for sequence models: (n_samples, timesteps, 1)
+        X_seq = X_lags.reshape(n_samples, timesteps, 1)
+
+        # Extract static (non-lagged) features
+        X_stat = df[self.stat_cols].values if self.stat_cols else None
+
+        # Extract the target values as a 1D array
+        y = df[self.target_col].values
+
+        return X_seq, X_stat, y
+    
+    def get_sequence_data(self):
+        """
+        Prepare sequence/static inputs and targets for CNN/LSTM.
+        """
+        # Load full dataset and split into train/test by time
+        df = self.load_data()
+        df_tr, df_te = self.temporal_split(df)
+
+        # Scale features on train/test, returning numpy arrays for features and targets
+        X_tr_arr, y_tr, X_te_arr, y_te = self.scale_split(df_tr, df_te)
+
+        # Rebuild pandas DataFrames from scaled arrays, re-attaching the target column
+        df_tr_s = pd.DataFrame(X_tr_arr, columns=self.feature_cols)
+        df_tr_s[self.target_col] = y_tr
+        df_te_s = pd.DataFrame(X_te_arr, columns=self.feature_cols)
+        df_te_s[self.target_col] = y_te
+
+        # Convert each DataFrame into:
+        #  - X_seq: lagged sequences tensor (n_samples, timesteps, 1)
+        #  - X_stat: static features array (n_samples, n_static) or None
+        #  - y_seq: target array (n_samples,)
+        X_seq_tr, X_stat_tr, y_tr_seq = self.create_sequences(df_tr_s)
+        X_seq_te, X_stat_te, y_te_seq = self.create_sequences(df_te_s)
+
+        return X_seq_tr, X_stat_tr, y_tr_seq, X_seq_te, X_stat_te, y_te_seq
+
+
+
+
+
+    
+    
+    
