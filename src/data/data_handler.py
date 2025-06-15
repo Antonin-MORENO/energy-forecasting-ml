@@ -146,31 +146,62 @@ class DataHandler:
 
         return X_seq, X_stat, y
     
-    def get_sequence_data(self):
+    def get_sequence_data(self, val_years: int = 1):
+        
         """
-        Prepare sequence/static inputs and targets for CNN/LSTM.
+        Splits data into training, validation, and test sets, then creates sequences.
+
+        - test: The final `self.holdout_years` of the dataset.
+        - trainval: The remaining data, used to fit the scaler.
+        - val: The final `val_years` from the scaled trainval set.
+        - train: The rest of the trainval set.
+
+        Returns:
+            X_seq_tr, X_stat_tr, y_tr,
+            X_seq_val, X_stat_val, y_val,
+            X_seq_te, X_stat_te, y_te
         """
         # Load full dataset and split into train/test by time
         df = self.load_data()
-        df_tr, df_te = self.temporal_split(df)
+        df_trainval, df_test = self.temporal_split(df)
 
         # Scale features on train/test, returning numpy arrays for features and targets
-        X_tr_arr, y_tr, X_te_arr, y_te = self.scale_split(df_tr, df_te)
+        X_trval_arr, y_trval, X_te_arr, y_te = self.scale_split(df_trainval, df_test)
 
-        # Rebuild pandas DataFrames from scaled arrays, re-attaching the target column
-        df_tr_s = pd.DataFrame(X_tr_arr, columns=self.feature_cols)
-        df_tr_s[self.target_col] = y_tr
-        df_te_s = pd.DataFrame(X_te_arr, columns=self.feature_cols)
-        df_te_s[self.target_col] = y_te
+        # Rebuild scaled train+val DataFrame and reattach dates
+        df_trval_s = pd.DataFrame(X_trval_arr, columns=self.feature_cols)
+        df_trval_s[self.target_col] = y_trval
+        df_trval_s[self.date_col]   = df_trainval[self.date_col].values
+
+        
+        # Rebuild scaled test DataFrame and reattach dates
+        df_test_s = pd.DataFrame(X_te_arr, columns=self.feature_cols)
+        df_test_s[self.target_col] = y_te
+        df_test_s[self.date_col]   = df_test[self.date_col].values
+
+        # Split off the last `val_years` years for validation
+        dates = pd.to_datetime(df_trval_s[self.date_col])
+        val_start = dates.max() - pd.DateOffset(years=val_years)
+        mask_val = dates >= val_start
+
+        df_val_s   = df_trval_s[mask_val].reset_index(drop=True)
+        df_train_s = df_trval_s[~mask_val].reset_index(drop=True)
+
+        
+        # Drop date column before sequence creation
+        for d in (df_train_s, df_val_s, df_test_s):
+            d.drop(columns=[self.date_col], inplace=True)
 
         # Convert each DataFrame into:
         #  - X_seq: lagged sequences tensor (n_samples, timesteps, 1)
         #  - X_stat: static features array (n_samples, n_static) or None
         #  - y_seq: target array (n_samples,)
-        X_seq_tr, X_stat_tr, y_tr_seq = self.create_sequences(df_tr_s)
-        X_seq_te, X_stat_te, y_te_seq = self.create_sequences(df_te_s)
+        X_seq_tr,  X_stat_tr,  y_tr_seq  = self.create_sequences(df_train_s)
+        X_seq_val, X_stat_val, y_val_seq = self.create_sequences(df_val_s)
+        X_seq_te,  X_stat_te,  y_te_seq  = self.create_sequences(df_test_s)
 
-        return X_seq_tr, X_stat_tr, y_tr_seq, X_seq_te, X_stat_te, y_te_seq
+        return X_seq_tr, X_stat_tr, y_tr_seq, X_seq_val, X_stat_val, y_val_seq, X_seq_te, X_stat_te, y_te_seq
+            
 
 
 
