@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from src.data.data_handler import DataHandler
 from src.models.lstm_model import LSTMModel
 import numpy as np 
-from sklearn.preprocessing import StandardScaler
 
 # Edit experiment settings
 exp_name    = 'lstm_all_lags_experiment_bs_32'
@@ -51,11 +50,7 @@ dh = DataHandler(
 #   X_seq_te, X_stat_te, y_te  : test (holdout_years)
 X_seq_tr, X_stat_tr, y_tr, X_seq_val, X_stat_val, y_val, X_seq_te, X_stat_te, y_te = dh.get_sequence_data(val_years=1)
 
-# Standard scale the target variable 
-y_scaler   = StandardScaler()
-y_tr_z     = y_scaler.fit_transform(y_tr.reshape(-1, 1)).ravel()
-y_val_z    = y_scaler.transform(y_val.reshape(-1, 1)).ravel()
-y_te_z     = y_scaler.transform(y_te.reshape(-1, 1)).ravel()
+
 
 # Configure model hyperparameter 
 params = {
@@ -79,61 +74,59 @@ params = {
 lstm = LSTMModel(params)
 
 # Prepare input dictionaries 
-X_train_dict = {"seq_input": X_seq_tr,   "static_input": X_stat_tr}
-X_val_dict   = {"seq_input": X_seq_val,  "static_input": X_stat_val}
-X_test_dict  = {"seq_input": X_seq_te,   "static_input": X_stat_te}
+X_train_dict = {'seq_input': X_seq_tr,   'static_input': X_stat_tr}
+X_val_dict   = {'seq_input': X_seq_val,  'static_input': X_stat_val}
+X_test_dict  = {'seq_input': X_seq_te,   'static_input': X_stat_te}
 
 # Training
 t0       = time.perf_counter()
-history  = lstm.fit(X_train_dict, y_tr_z, X_val=X_val_dict, y_val=y_val_z)
+history  = lstm.fit(X_train_dict, y_tr, X_val=X_val_dict, y_val=y_val)
 train_tm = time.perf_counter() - t0
 
 # Hold-out evaluation (inverse transform predictions)
-preds_z  = lstm.predict(X_test_dict)
-preds    = y_scaler.inverse_transform(preds_z.reshape(-1, 1)).ravel()
-
+preds  = lstm.predict(X_test_dict)
 
 
 # Compute classical error metrics on the unscaled values
 errors   = preds - y_te
 metrics  = {
-    "rmse": np.sqrt((errors ** 2).mean()),
-    "mae" : np.abs(errors).mean(),
-    "mape": np.mean(np.abs(errors / y_te)) * 100,
-    "sd"  : errors.std()
+    'rmse': np.sqrt((errors ** 2).mean()),
+    'mae' : np.abs(errors).mean(),
+    'mape': np.mean(np.abs(errors / y_te)) * 100,
+    'sd'  : errors.std()
 }
 
 
 # Save hold-out metrics to JSON
-with open(os.path.join(metrics_dir, "holdout_metrics.json"), "w") as f:
+with open(os.path.join(metrics_dir, 'holdout_metrics.json'), 'w') as f:
     json.dump(metrics, f, indent=2)
 
 
 # Save full training history (loss & metrics per epoch)
-with open(os.path.join(metrics_dir, "training_history.json"), "w") as f:
+with open(os.path.join(metrics_dir, 'training_history.json'), 'w') as f:
     json.dump(history.history, f, indent=2)
 
 # Plot & save learning curves 
 # MSE curve
 plt.figure()
-plt.plot(history.history["loss"],    label="train_mse")
-plt.plot(history.history["val_loss"],label="val_mse")
-plt.title("MSE per epoch")
-plt.xlabel("Epoch")
-plt.ylabel("MSE")
+plt.plot(history.history['loss'],    label='train_mse')
+plt.plot(history.history['val_loss'],label='val_mse')
+plt.title('MSE per epoch')
+plt.xlabel('Epoch')
+plt.ylabel('MSE')
 plt.legend()
-plt.savefig(os.path.join(fig_dir, "mse_curve.png"))
+plt.savefig(os.path.join(fig_dir, 'mse_curve.png'))
 plt.close()
 
 # MAE curve
 plt.figure()
-plt.plot(history.history["mae"],     label="train_mae")
-plt.plot(history.history["val_mae"], label="val_mae")
-plt.title("MAE per epoch")
-plt.xlabel("Epoch")
-plt.ylabel("MAE")
+plt.plot(history.history['mae'],     label='train_mae')
+plt.plot(history.history['val_mae'], label='val_mae')
+plt.title('MAE per epoch')
+plt.xlabel('Epoch')
+plt.ylabel('MAE')
 plt.legend()
-plt.savefig(os.path.join(fig_dir, "mae_curve.png"))
+plt.savefig(os.path.join(fig_dir, 'mae_curve.png'))
 plt.close()
 
-print(f"Training done. Hold-out metrics saved to {metrics_dir}")
+print(f'Training done. Hold-out metrics saved to {metrics_dir}')

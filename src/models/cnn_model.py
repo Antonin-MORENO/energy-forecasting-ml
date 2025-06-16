@@ -78,7 +78,7 @@ class CNNModel(BaseModel):
         p = self.params
         callbacks = []
         
-        if self.params.get("scale_y", False):
+        if self.params.get('scale_y', False):
             self.y_scaler = StandardScaler()
             y_train = self.y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
             if y_val is not None:
@@ -136,7 +136,11 @@ class CNNModel(BaseModel):
         Generates predictions for the given input data X.
         """
         preds = self.model.predict(X, verbose=0)
-        return preds.flatten()
+        # Inverse transform the target if it was scaled during training
+        if self.params.get('scale_y', False):
+            preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
+            
+        return preds
 
     def save(self, path: str):
         """

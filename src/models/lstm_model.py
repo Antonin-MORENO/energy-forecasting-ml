@@ -101,7 +101,12 @@ class LSTMModel(BaseModel):
 
     def predict(self, X):
         preds = self.model.predict(X, verbose=0)
-        return preds.flatten()
+        # Inverse transform the target if it was scaled during training
+        if self.params.get('scale_y', False):
+            preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
+            
+        return preds
+    
 
     def save(self, path: str):
         os.makedirs(os.path.dirname(path), exist_ok=True)
