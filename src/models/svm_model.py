@@ -1,6 +1,8 @@
 from sklearn.svm import SVR
 from src.models.base_model import BaseModel
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.preprocessing import StandardScaler
+
 
 class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
     """
@@ -31,10 +33,10 @@ class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
         """
         p = self.params
         # Get SVR specific hyperparameters
-        C = p.get("C", 1.0)
-        kernel = p.get("kernel", "rbf")
-        gamma = p.get("gamma", "scale")
-        epsilon = p.get("epsilon", 0.1)
+        C = p.get('C', 1.0)
+        kernel = p.get('kernel', 'rbf')
+        gamma = p.get('gamma', 'scale')
+        epsilon = p.get('epsilon', 0.1)
 
         self.model = SVR(
             C=C,
@@ -48,13 +50,24 @@ class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
         Train SVR on (X_train, y_train).
         X_val and y_val are ignored but kept for interface consistency.
         """
+        
+        # Scale target if needed
+        if self.params.get('scale_y', False):
+            self.y_scaler = StandardScaler()
+            y_train = self.y_scaler.fit_transform(y_train.reshape(-1,1)).ravel()
+            
         self.model.fit(X_train, y_train)
 
     def predict(self, X):
         """
         Returns a 1D array of predictions from the trained SVR model.
         """
-        return self.model.predict(X)
+        preds = self.model.predict(X)
+        # Inverse transform the target if it was scaled during training
+        if self.params.get('scale_y', False):
+            preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
+            
+        return preds
 
     def get_params(self, deep=True):
         """
@@ -77,11 +90,11 @@ class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
         """
         Not implemented for SVMModel.
         """
-        raise NotImplementedError("save() is not implemented for SVMModel")
+        raise NotImplementedError('save() is not implemented for SVMModel')
 
     @classmethod
     def load(cls, path: str):
         """
         Not implemented for SVMModel.
         """
-        raise NotImplementedError("load() is not implemented for SVMModel")
+        raise NotImplementedError('load() is not implemented for SVMModel')
