@@ -84,8 +84,9 @@ history  = lstm.fit(X_train_dict, y_tr, X_val=X_val_dict, y_val=y_val)
 train_tm = time.perf_counter() - t0
 
 # Hold-out evaluation (inverse transform predictions)
+t0 = time.perf_counter()
 preds  = lstm.predict(X_test_dict)
-
+pred_time = time.perf_counter() - t0
 
 # Compute classical error metrics on the unscaled values
 errors   = preds - y_te
@@ -93,7 +94,9 @@ metrics  = {
     'rmse': np.sqrt((errors ** 2).mean()),
     'mae' : np.abs(errors).mean(),
     'mape': np.mean(np.abs(errors / y_te)) * 100,
-    'sd'  : errors.std()
+    'sd'  : errors.std(),
+    'test_pred_time_s' : pred_time
+    
 }
 
 
