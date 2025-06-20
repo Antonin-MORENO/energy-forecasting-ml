@@ -1,3 +1,5 @@
+import os
+import joblib
 from src.models.base_model import BaseModel
 from sklearn.base import BaseEstimator, RegressorMixin
 from xgboost import XGBRegressor
@@ -83,13 +85,14 @@ class XGBoostModel(BaseModel, BaseEstimator, RegressorMixin):
 
     def save(self, path: str):
         """
-        Not implemented for XGBoostModel.
+        Save the trained XGBoost model to disk.
         """
-        raise NotImplementedError("save() is not implemented for XGBoostModel")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        joblib.dump(self, path)
 
     @classmethod
     def load(cls, path: str):
         """
-        Not implemented for XGBoostModel.
+        Load a trained XGBoost model from disk.
         """
-        raise NotImplementedError("load() is not implemented for XGBoostModel")
+        return joblib.load(path)
