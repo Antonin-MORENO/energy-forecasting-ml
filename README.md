@@ -73,3 +73,31 @@ This document summarizes the methodology and technical choices made in construct
         1.  The `GridSearchCV` was first run on a smaller subset of data, corresponding to **two years of training history**.
         2.  Once the optimal parameters (`C`, `gamma`, `epsilon`, `kernel` ) were identified, a **new `SVM` model was re-trained on the entire 7-year training dataset** using this optimal configuration.
     * **Final Evaluation:** All models, including the final `SVM`, were evaluated on the hold-out test set (the year 2017) using metrics for accuracy (`RMSE`, `MAE`, `MAPE`) and efficiency (`test_pred_time_s`).
+
+
+### 7. Results
+
+The final performance of all models on the holdout test set is summarized in the charts below. The metrics used are Mean Absolute Error (MAE), Root Mean Squared Error (RMSE), and the trade-off between RMSE and prediction time.
+
+#### A. Accuracy Comparison (MAE and RMSE)
+
+The bar charts show a clear performance hierarchy.
+* The `LSTM`, `Random Forest`, `XGBoost`, and `SVM` models form a top tier, achieving significantly lower error rates than the others. Their MAE values are all below 250, and their RMSE values are around 330.
+* The `CNN` model performs moderately well, positioned between the top tier and the `KNN` model.
+* The `KNN` model is a clear outlier, with dramatically higher MAE (819.37) and RMSE (1101.96), indicating its unsuitability for this specific forecasting task.
+
+![Holdout MAE Comparison](assets/images/holdout_mae_basis_comparison.png)
+
+![Holdout RMSE Comparison](assets/images/holdout_rmse_basis_comparison.png)
+
+#### B. Performance vs. Prediction Time Trade-off
+
+This scatter plot visualizes the crucial balance between predictive accuracy (Holdout RMSE) and computational efficiency (Prediction Time).
+
+* **High Performance, Fast Prediction:** `Random Forest` and `XGBoost` offer an excellent compromise, providing top-tier accuracy with very fast prediction times (around 1-2 seconds).
+* **High Performance, Slow Prediction:** The `SVM` model, while being very accurate, is computationally expensive, taking over 100 seconds for prediction. The `LSTM` model also offers high accuracy but at a slower pace than the tree-based ensembles.
+* **Low Performance:** The `KNN` model is not only the least accurate but also relatively slow compared to the best-performing models.
+
+This analysis suggests that for a production environment where both accuracy and speed are critical, **`XGBoost`, `Random Forest` and `lstm` represent the most balanced and effective solutions.**
+
+![Holdout RMSE vs. Prediction Time](assets/images/tradeoff_prediction_time_rmse.png)
