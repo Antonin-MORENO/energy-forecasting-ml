@@ -4,7 +4,6 @@ import json
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from src.data.data_handler import DataHandler
 from src.models.knn_model import KNNModel
-import numpy as np 
 
 
 # Edit experiment name
@@ -72,78 +71,42 @@ start = time.perf_counter() # Measure the time to fit the model with all paramet
 gs.fit(X_trval, y_trval)
 print(f'GridSearchCV done in {time.perf_counter() - start:.1f}s')
 
-# Extract CV results
-cv = gs.cv_results_
-params_list       = cv['params']
-mean_test_rmse    = -cv['mean_test_score']  # convert back to positive RMSE
-std_test_rmse     =  cv['std_test_score']
-mean_train_rmse   = -cv['mean_train_score']
-std_train_rmse    =  cv['std_train_score']
-mean_fit_time     =  cv['mean_fit_time']
-std_fit_time      =  cv['std_fit_time']
+# Retrieve the best model and its parameters
+best_model = gs.best_estimator_
+best_params = gs.best_params_
 
-# Identify top-3 parameter combinations by CV performance
-ranked_idxs = np.argsort(mean_test_rmse)
-top3 = []
-for rank, idx in enumerate(ranked_idxs[:3], start=1):
-    p = params_list[idx]
-    
-    # Refit on full train for test‐set evaluation
-    model = KNNModel(**p)
-    model.fit(X_trval, y_trval)
-    
-    # Measure prediction time on the hold-out test set
-    t0 = time.perf_counter()
-    model.predict(X_test)
-    pred_time = time.perf_counter() - t0
-    
-    # Compute final hold-out metrics (RMSE, MAE, MAPE, SD)
-    hold = model.evaluate(X_test, y_test)
-    
-    
-    top3.append({
-        'rank':               rank,
-        'params':             p,
-        'cv_rmse_mean':       round(mean_test_rmse[idx], 3),
-        'cv_rmse_std':        round(std_test_rmse[idx], 3),
-        'train_rmse_mean':    round(mean_train_rmse[idx], 3),
-        'train_rmse_std':     round(std_train_rmse[idx], 3),
-        'fit_time_mean_s':    round(mean_fit_time[idx], 3),
-        'fit_time_std_s':     round(std_fit_time[idx], 3),
-        'test_pred_time_s':   round(pred_time, 4),
-        'holdout_rmse':       round(hold['rmse'], 3),
-        'holdout_mae':        round(hold['mae'], 3),
-        'holdout_mape':       round(hold['mape'], 2),
-        'holdout_sd_error':   round(hold['sd'], 3)
-    })
 
-# Save JSON files under metrics directory
+# Evaluate on the test set
+t0 = time.perf_counter()
+y_pred = best_model.predict(X_test)
+pred_time = time.perf_counter() - t0
 
-# Raw cv_results 
-with open(os.path.join(exp_metrics, 'cv_results.json'), 'w') as f:
-    json.dump(
-        {k: v.tolist() if hasattr(v, 'tolist') else v for k, v in cv.items()},
-        f, indent=2
-    )
+# Compute holdout metrics
+holdout_metrics = best_model.evaluate(X_test, y_test)
+holdout_metrics.update({
+    'test_pred_time_s': round(pred_time, 4),
+    'params': best_params
+})
 
-# Top-3 configurations + metrics
-with open(os.path.join(exp_metrics, 'top3_results.json'), 'w') as f:
-    json.dump(top3, f, indent=2)
 
-# Hold-out metrics for all top-3
-holdout_all = [
-    {
-        'rank':             e['rank'],
-        'params':           e['params'],
-        'holdout_rmse':     e['holdout_rmse'],
-        'holdout_mae':      e['holdout_mae'],
-        'holdout_mape':     e['holdout_mape'],
-        'holdout_sd_error': e['holdout_sd_error'],
-        'test_pred_time_s': e['test_pred_time_s']
-    }
-    for e in top3
-]
-with open(os.path.join(exp_metrics, 'holdout_metrics.json'), 'w') as f:
-    json.dump(holdout_all, f, indent=2)
+# Create model output directory
+model_dir = os.path.join('outputs', 'experiments', exp_name, 'metrics')
+os.makedirs(model_dir, exist_ok=True)
 
-print(f'Metrics written to {exp_metrics}')
+# Save trained model
+model_path = os.path.join(model_dir, 'best_model.pkl')
+best_model.save(model_path)
+
+# Save best hyperparameters
+params_path = os.path.join(model_dir, 'best_model_params.json')
+with open(params_path, 'w') as f:
+    json.dump(best_params, f, indent=2)
+
+# Save test set metrics
+metrics_path = os.path.join(model_dir, 'best_model_metrics.json')
+with open(metrics_path, 'w') as f:
+    json.dump(holdout_metrics, f, indent=2)
+
+print(f' Best model saved to: {model_path}')
+print(f' Params saved to:     {params_path}')
+print(f' Test metrics saved to: {metrics_path}')
