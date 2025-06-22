@@ -1,4 +1,5 @@
-
+import os
+import joblib
 from sklearn.neighbors import KNeighborsRegressor
 from src.models.base_model import BaseModel
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -35,11 +36,11 @@ class KNNModel(BaseModel, BaseEstimator, RegressorMixin):
         Instantiate the KNeighborsRegressor using values from self.params.
         """
         p = self.params
-        n_neighbors = p.get("n_neighbors", 5)
-        weights     = p.get("weights", "uniform")
-        algorithm   = p.get("algorithm", "auto")
-        leaf_size   = p.get("leaf_size", 30)
-        p_norm      = p.get("p", 2)
+        n_neighbors = p.get('n_neighbors', 5)
+        weights     = p.get('weights', 'uniform')
+        algorithm   = p.get('algorithm', 'auto')
+        leaf_size   = p.get('leaf_size', 30)
+        p_norm      = p.get('p', 2)
 
         self.model = KNeighborsRegressor(
             n_neighbors=n_neighbors,
@@ -82,13 +83,14 @@ class KNNModel(BaseModel, BaseEstimator, RegressorMixin):
 
     def save(self, path: str):
         """
-        Not implemented for KNNModel.
+        Save the trained knn model to disk.
         """
-        raise NotImplementedError("save() is not implemented for KNNModel")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        joblib.dump(self, path)
 
     @classmethod
     def load(cls, path: str):
         """
-        Not implemented for KNNModel.
+        Load a trained knn model from disk.
         """
-        raise NotImplementedError("load() is not implemented for KNNModel")
+        return joblib.load(path)
