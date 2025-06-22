@@ -1,3 +1,5 @@
+import os
+import joblib
 from sklearn.ensemble import RandomForestRegressor
 from src.models.base_model import BaseModel
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -27,12 +29,12 @@ class RandomForestModel(BaseModel, BaseEstimator, RegressorMixin):
         """
         p = self.params
         # Get Random Forest specific hyperparameters
-        n_estimators = p.get("n_estimators", 100)
-        max_depth    = p.get("max_depth", None)
-        min_samples_split = p.get("min_samples_split", 2)
-        min_samples_leaf = p.get("min_samples_leaf", 1)
-        random_state = p.get("random_state", 42)
-        max_features = p.get("max_features", 1.0) 
+        n_estimators = p.get('n_estimators', 100)
+        max_depth    = p.get('max_depth', None)
+        min_samples_split = p.get('min_samples_split', 2)
+        min_samples_leaf = p.get('min_samples_leaf', 1)
+        random_state = p.get('random_state', 42)
+        max_features = p.get('max_features', 1.0) 
 
         self.model = RandomForestRegressor(
             n_estimators=n_estimators,
@@ -72,13 +74,14 @@ class RandomForestModel(BaseModel, BaseEstimator, RegressorMixin):
 
     def save(self, path: str):
         """
-        Not implemented for RandomForestModel.
+        Save the trained rf model to disk.
         """
-        raise NotImplementedError("save() is not implemented for RandomForestModel")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        joblib.dump(self, path)
 
     @classmethod
     def load(cls, path: str):
         """
-        Not implemented for RandomForestModel.
+        Load a trained rf model from disk.
         """
-        raise NotImplementedError("load() is not implemented for RandomForestModel")
+        return joblib.load(path)
