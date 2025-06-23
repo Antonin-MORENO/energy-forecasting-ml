@@ -1,3 +1,5 @@
+import os
+import joblib
 from sklearn.svm import SVR
 from src.models.base_model import BaseModel
 from sklearn.base import BaseEstimator, RegressorMixin
@@ -88,13 +90,14 @@ class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
 
     def save(self, path: str):
         """
-        Not implemented for SVMModel.
+        Save the trained rf model to disk.
         """
-        raise NotImplementedError('save() is not implemented for SVMModel')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        joblib.dump(self, path)
 
     @classmethod
     def load(cls, path: str):
         """
-        Not implemented for SVMModel.
+        Load a trained rf model from disk.
         """
-        raise NotImplementedError('load() is not implemented for SVMModel')
+        return joblib.load(path)
