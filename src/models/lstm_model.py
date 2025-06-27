@@ -1,6 +1,6 @@
 import os
 from keras import Model, Input
-from keras.layers import LSTM, Dense, concatenate
+from keras.layers import LSTM, Dense, concatenate, Bidirectional
 from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from keras.models import load_model
 from keras.optimizers import Adam
@@ -21,8 +21,9 @@ class LSTMModel(BaseModel):
 
         # Sequence Input Branch (LSTM)
         input_seq = Input(shape=p['input_shape_seq'], name='seq_input')
-        x_seq = LSTM(p.get('lstm_units', 64), return_sequences=False)(input_seq)
+        x_seq = Bidirectional(LSTM(p.get('lstm_units', 64), return_sequences=False))(input_seq)
 
+        
         # Static Features Input Branch
         input_stat = Input(shape=(p['input_shape_stat'],), name='static_input')
 
@@ -46,12 +47,19 @@ class LSTMModel(BaseModel):
         p = self.params
         callbacks = []
 
-        # Optional scaling of target
-        if p.get("scale_y", False):
+        self.scale_mode = p.get('scale_mode', None)
+
+        if self.scale_mode == 'standard':
             self.y_scaler = StandardScaler()
             y_train = self.y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
             if y_val is not None:
                 y_val = self.y_scaler.transform(y_val.reshape(-1, 1)).ravel()
+
+        elif self.scale_mode == 'divide':
+            self.scale_factor = 100_000
+            y_train = y_train / self.scale_factor
+            if y_val is not None:
+                y_val = y_val / self.scale_factor
 
         # Checkpoint callback
         if p.get('checkpoint_path'):
@@ -100,10 +108,11 @@ class LSTMModel(BaseModel):
         )
 
     def predict(self, X):
-        preds = self.model.predict(X, verbose=0)
-        # Inverse transform the target if it was scaled during training
-        if self.params.get('scale_y', False):
+        preds = self.model.predict(X, verbose=1)
+        if getattr(self, 'scale_mode', None) == 'standard':
             preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
+        elif getattr(self, 'scale_mode', None) == 'divide':
+            preds = preds * self.scale_factor
             
         return preds
     
