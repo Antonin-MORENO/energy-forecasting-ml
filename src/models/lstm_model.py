@@ -5,7 +5,7 @@ from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from keras.models import load_model
 from keras.optimizers import Adam
 from src.models.base_model import BaseModel
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 class LSTMModel(BaseModel):
     """
@@ -56,10 +56,17 @@ class LSTMModel(BaseModel):
                 y_val = self.y_scaler.transform(y_val.reshape(-1, 1)).ravel()
 
         elif self.scale_mode == 'divide':
-            self.scale_factor = 100_000
+            self.scale_factor = 60000
             y_train = y_train / self.scale_factor
             if y_val is not None:
                 y_val = y_val / self.scale_factor
+                
+        elif self.scale_mode == 'minmax':
+            self.y_scaler = MinMaxScaler()
+            y_train = self.y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
+            if y_val is not None:
+                y_val = self.y_scaler.transform(y_val.reshape(-1, 1)).ravel()
+            
 
         # Checkpoint callback
         if p.get('checkpoint_path'):
@@ -113,6 +120,9 @@ class LSTMModel(BaseModel):
             preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
         elif getattr(self, 'scale_mode', None) == 'divide':
             preds = preds * self.scale_factor
+            
+        elif getattr(self, 'scale_mode', None) == 'minmax':
+            preds = self.y_scaler.inverse_transform(preds.reshape(-1, 1)).ravel()
             
         return preds
     
