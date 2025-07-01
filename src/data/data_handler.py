@@ -202,11 +202,64 @@ class DataHandler:
 
         return X_seq_tr, X_stat_tr, y_tr_seq, X_seq_val, X_stat_val, y_val_seq, X_seq_te, X_stat_te, y_te_seq
             
-
-
-
-
-
     
-    
-    
+
+    def get_train_val_test_split(self, val_years: int = 1):
+        """
+        Splits data into training, validation, and test sets for traditional ML models.
+
+        - 1. Splits the full dataset into a preliminary train/val set and a final test set.
+        - 2. Splits the preliminary train/val set further into a final training set and a validation set.
+        - 3. Fits the scaler ONLY on the final training set and transforms all three sets.
+        
+        Returns:
+            (X_train, y_train, X_val, y_val, X_test, y_test) as NumPy arrays.
+        """
+        # Load and split the full dataset into train/val and test sets
+        df = self.load_data()
+        df_trainval, df_test = self.temporal_split(df)
+
+        
+        
+        # Determine the cutoff date to separate the training set from the validation set.
+        # This is done by taking the last date in the combined train/val set and subtracting the specified number of years.
+        val_cutoff = df_trainval[self.date_col].max() - pd.DateOffset(years=val_years)
+        
+        # Create the final training and validation dataframes based on the cutoff date.
+        df_train = df_trainval[df_trainval[self.date_col] < val_cutoff].copy()
+        df_val = df_trainval[df_trainval[self.date_col] >= val_cutoff].copy()
+
+        print(f"Train set: {df_train[self.date_col].min()} to {df_train[self.date_col].max()}")
+        print(f"Validation set: {df_val[self.date_col].min()} to {df_val[self.date_col].max()}")
+        print(f"Test set: {df_test[self.date_col].min()} to {df_test[self.date_col].max()}")
+
+        # Identify the columns that require scaling by excluding specified columns.
+        cols_to_scale = [col for col in self.feature_cols if col not in self.no_scale_cols]
+
+        # Initialize the scaler based on the specified type ('standard' or 'minmax').
+        if self.scaler_type == 'standard':
+            self.scaler = StandardScaler()
+        elif self.scaler_type == 'minmax':
+            self.scaler = MinMaxScaler()
+        else:
+            self.scaler = None
+
+        # Prepare the feature dataframes for each set.
+        X_train_df = df_train[self.feature_cols].copy()
+        X_val_df = df_val[self.feature_cols].copy()
+        X_test_df = df_test[self.feature_cols].copy()
+
+        # Extract the target variable arrays from each set.
+        y_train = df_train[self.target_col].values
+        y_val = df_val[self.target_col].values
+        y_test = df_test[self.target_col].values
+
+        # If a scaler is initialized, fit it ONLY on the training data to avoid data leakage.
+        # Then, use the fitted scaler to transform the training, validation, and test sets.
+        if self.scaler is not None:
+            X_train_df[cols_to_scale] = self.scaler.fit_transform(X_train_df[cols_to_scale])
+            X_val_df[cols_to_scale] = self.scaler.transform(X_val_df[cols_to_scale])
+            X_test_df[cols_to_scale] = self.scaler.transform(X_test_df[cols_to_scale])
+
+        # Return the six required NumPy arrays for model training and evaluation.
+        return X_train_df.values, y_train, X_val_df.values, y_val, X_test_df.values, y_test
