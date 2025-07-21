@@ -7,10 +7,10 @@ import pandas as pd
 from src.data.data_handler import DataHandler
 from src.models.lstm_quantile_model import LSTMQuantileModel
 import numpy as np
-
+import joblib
 # --- 1. Experiment Setup ---
 # Define a unique name for the experiment to organize outputs
-exp_name    = 'lstm_quantile_experiment_bs_32_bidirectional_64_q01-50-99_minmax'
+exp_name    = 'lstm_quantile_experiment_bs_32_bidirectional_64_q01-50-99_minmax_save'
 
 # Define base directories for outputs
 base_dir    = os.path.join('outputs', 'experiments', exp_name)
@@ -111,6 +111,12 @@ with open(os.path.join(metrics_dir, 'holdout_metrics.json'), 'w') as f:
     json.dump(metrics, f, indent=2)
 with open(os.path.join(metrics_dir, 'training_history.json'), 'w') as f:
     json.dump(history.history, f, indent=2)
+
+# --- ADD THESE TWO LINES ---
+scaler_path = os.path.join(base_dir, 'y_scaler.pkl')
+joblib.dump(lstm_q.y_scaler, scaler_path)
+
+print(f"   -> Scaler parameters saved to: {scaler_path}")
 
 # --- 8. Plot Learning Curves ---
 plt.figure()
