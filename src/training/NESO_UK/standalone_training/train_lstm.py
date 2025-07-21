@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from src.data.data_handler import DataHandler
 from src.models.lstm_model import LSTMModel
 import numpy as np 
-
+import joblib
 # Edit experiment settings
-exp_name    = 'lstm_all_lags_experiment_bs_32'
+exp_name    = 'lstm_all_lags_experiment_bs_32_bidirectional_256_minmax_save'
 base_dir    = os.path.join('outputs','experiments', exp_name)
 metrics_dir = os.path.join(base_dir, 'metrics')
 fig_dir     = os.path.join(base_dir, 'figures')
@@ -40,7 +40,7 @@ dh = DataHandler(
     no_scale_cols = no_scale_cols,
     holdout_ratio = None,
     holdout_years = 1,         # hold out the last full year
-    scaler_type   = 'standard'
+    scaler_type   = 'minmax',  # use min-max scaling for features
 )
 
 
@@ -51,22 +51,22 @@ dh = DataHandler(
 X_seq_tr, X_stat_tr, y_tr, X_seq_val, X_stat_val, y_val, X_seq_te, X_stat_te, y_te = dh.get_sequence_data(val_years=1)
 
 
-
 # Configure model hyperparameter 
 params = {
     'input_shape_seq': X_seq_tr.shape[1:],
     'input_shape_stat': X_stat_tr.shape[1],
     'lstm_units': 64,
-    'dense_units': 128,
+    'dense_units': 256,
     'optimizer': 'adam',
     'loss': 'mse',
-    'metrics': ['mae'],
+    'metrics': ['mae'], 
     'epochs': 200,
     'batch_size': 32,
     'early_stop_patience': 10,
     'checkpoint_path': os.path.join(base_dir, 'checkpoints', 'best_lstm_model.keras'),
     'scale_y': True,
-    'verbose': 1
+    'verbose': 1,
+    'scale_mode': 'standard',  # use standard scaling for target variable
 }
 
 
@@ -108,6 +108,14 @@ with open(os.path.join(metrics_dir, 'holdout_metrics.json'), 'w') as f:
 # Save full training history (loss & metrics per epoch)
 with open(os.path.join(metrics_dir, 'training_history.json'), 'w') as f:
     json.dump(history.history, f, indent=2)
+
+
+# --- ADD THESE TWO LINES ---
+scaler_path = os.path.join(base_dir, 'y_scaler.pkl')
+joblib.dump(lstm.y_scaler, scaler_path)
+
+print(f"   -> Scaler parameters saved to: {scaler_path}")
+
 
 # Plot & save learning curves 
 # MSE curve
