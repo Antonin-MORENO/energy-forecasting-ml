@@ -101,3 +101,118 @@ This scatter plot visualizes the crucial balance between predictive accuracy (Ho
 This analysis suggests that for a production environment where both accuracy and speed are critical, **`XGBoost`, `Random Forest` and `lstm` represent the most balanced and effective solutions.**
 
 ![Holdout RMSE vs. Prediction Time](assets/images/tradeoff_prediction_time_rmse.png)
+
+
+
+
+
+
+### 8. Apartment-Level Forecasting Pipeline
+
+This section outlines the end-to-end process used to predict the **hourly electricity consumption** of an individual apartment, starting from raw data and leveraging both classical and deep learning models.
+
+#### A. Objective
+
+To forecast an apartment’s electricity demand based on its historical consumption and temperature data, while incorporating key time-based patterns (hour, weekday, month, etc.).
+
+---
+
+#### B. Data Preparation Pipeline
+
+1. **Cleaning and Merging (`clean_and_merge_power_weather.py`)**
+
+   * Raw electricity usage data (2014–2016) is cleaned: duplicates are removed, and missing values are interpolated.
+   * These time series are then merged with hourly weather data (temperature).
+   * **Output:** One continuous time-series `.csv` file per apartment.
+
+2. **Feature Engineering (`build_features_UMass.py`)**
+
+   * Adds calendar-based features: `hour`, `month`, `weekday`, `is_weekend`.
+   * Generates historical lag features (`power_lag_1`, `power_lag_24`, `power_lag_168`) to provide temporal context.
+   * **Output:** One enriched dataset per apartment.
+
+3. **Cyclical Encoding (`preprocessing_UMass.py`)**
+
+   * Calendar features (`hour`, `weekday`, `month`) are transformed into cyclical form using sine and cosine functions.
+   * **Output:** Fully preprocessed datasets ready for model training.
+
+4. **Aggregation and Splitting (`aggregate_and_split_apartment_data.py`)**
+
+   * All apartment datasets are merged into a single training set.
+   * One apartment (e.g., `Apt1` in 2016) is held out as an **independent test set** to evaluate generalization on unseen units.
+
+
+
+
+
+#### C. Trained Models and Input Features
+
+Two forecasting models were trained and evaluated on the apartment data:
+
+1. **LSTM (Long Short-Term Memory neural network)**
+
+   * **Sequential input:**
+
+     * Past consumption lags:
+       `power [kW]_lag_1`, `power [kW]_lag_24`, `power [kW]_lag_168`
+     * External variable:
+       `temperature`
+   * **Static input:**
+
+     * Cyclically encoded time features:
+       `hour_sin`, `hour_cos`, `weekday_sin`, `weekday_cos`, `month_sin`, `month_cos`
+
+       * binary feature `is_weekend`
+
+2. **XGBoost (Extreme Gradient Boosting)**
+
+   * **Input features:**
+
+     * `temperature`, `hour_sin`, `hour_cos`, `weekday_sin`, `weekday_cos`, `month_sin`, `month_cos`, `is_weekend`
+
+Each model was trained on a multi-apartment dataset and tested on a holdout apartment (`Apt1`, 2016).
+
+
+
+
+---
+
+### 🔍 General Analysis – LSTM Forecast on Apartment Test Set
+
+<p align="center">
+  <img src="assets/images/output.png" width="750"/>
+</p>
+
+This plot displays the **true vs predicted hourly power consumption** for an apartment over the full test period (\~9000 time steps, likely covering one year).
+
+---
+
+### 🧠 Key Observations
+
+#### 1. ✅ **Global Seasonality Captured**
+
+* The LSTM model successfully captures the **long-term seasonal trend**:
+
+  * **Higher consumption** at the beginning and end (likely winter).
+  * **Lower consumption** in the middle section (probably summer).
+* This confirms that the model has learned the **overall shape and temporal rhythm** of the apartment’s demand profile.
+
+#### 2. 🔁 **Day-to-Day Dynamics Approximated**
+
+* The predicted curve follows the **general fluctuations** of the true demand curve.
+* Peaks and valleys occur at the **right moments**, suggesting that the model has internalized some **daily or weekly cycles**.
+
+#### 3. ⚠️ **Systematic Underestimation of Peaks**
+
+* The predicted values rarely exceed **3 kW**, while actual consumption often reaches **5–8 kW**.
+* This indicates that the model tends to **smooth out sharp peaks**
+
+#### 4. 🧯 **No Instability or Noise**
+
+* The predictions remain stable and realistic throughout.
+* There are **no erratic spikes or drops**, which suggests the model is **robust** and not overfitting.
+
+
+
+
+

@@ -1,112 +1,119 @@
 import os
 import time
 import json
+import numpy as np
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+from sklearn.metrics import make_scorer, mean_absolute_error, mean_absolute_percentage_error
 from src.data.data_handler import DataHandler
 from src.models.knn_model import KNNModel
 
-
-# Edit experiment name
-exp_name = 'all_features_std_norm_knn_experiment'  
-
-# Prepare output directory for metrics
-# Creates: outputs/experiments/<exp_name>/metrics/
+# Experiment name
+exp_name = 'all_features_std_norm_knn_experiment'
 exp_metrics = os.path.join('outputs', 'experiments', exp_name, 'metrics')
 os.makedirs(exp_metrics, exist_ok=True)
 
-
-# Define data paths and features
-csv_path     = 'data/processed/NESO_UK/preprocessed_new_features_cleaned_DemandData_2011-2018.csv'
-date_col     = 'datetime'
-feature_cols = ['NON_BM_STOR','I014_PUMP_STORAGE_PUMPING','is_interpolated','is_weekend',
-                'I014_ND_lag_1','I014_ND_lag_2','I014_ND_lag_48','I014_ND_lag_96','I014_ND_lag_336',
-                'I014_ND_mean_48','I014_ND_mean_336','net_import','wind_capacity_factor',
-                'solar_capacity_factor','hour_sin','hour_cos','weekday_sin','weekday_cos','month_sin','month_cos'
+# Data parameters
+csv_path = 'data/processed/NESO_UK/preprocessed_new_features_cleaned_DemandData_2011-2018.csv'
+date_col = 'datetime'
+feature_cols = [
+    'NON_BM_STOR','I014_PUMP_STORAGE_PUMPING','is_interpolated','is_weekend',
+    'I014_ND_lag_1','I014_ND_lag_2','I014_ND_lag_48','I014_ND_lag_96','I014_ND_lag_336',
+    'I014_ND_mean_48','I014_ND_mean_336','net_import','wind_capacity_factor',
+    'solar_capacity_factor','hour_sin','hour_cos','weekday_sin','weekday_cos','month_sin','month_cos'
 ]
-target_col   = 'I014_ND'
+target_col = 'I014_ND'
 no_scale_cols = ['is_interpolated','is_weekend','hour_sin','hour_cos','weekday_sin','weekday_cos','month_sin','month_cos']
 
-# Load and split the data, holding out the last full year as test
+# Load data
 dh = DataHandler(
-    csv_path      = csv_path,
-    date_col      = date_col,
-    feature_cols  = feature_cols,
-    target_col    = target_col,
-    no_scale_cols = no_scale_cols,
-    holdout_ratio = None,
-    holdout_years = 1,            # hold out the last full year
-    scaler_type   = 'standard'
+    csv_path=csv_path,
+    date_col=date_col,
+    feature_cols=feature_cols,
+    target_col=target_col,
+    no_scale_cols=no_scale_cols,
+    holdout_ratio=None,
+    holdout_years=1,
+    scaler_type='standard'
 )
 
 df_full = dh.load_data()
-
 df_trainval, df_test = dh.temporal_split(df_full)
-
 X_trval, y_trval, X_test, y_test = dh.scale_split(df_trainval, df_test)
 
-
-
-# Configure hyperparameter grid and time-series splitter
+# Hyperparameters
 param_grid = {
     'n_neighbors': [3, 5, 7, 9],
-    'weights':     ['uniform', 'distance'],
-    'p':           [1, 2]
+    'weights': ['uniform', 'distance'],
+    'p': [1, 2]
 }
 tscv = TimeSeriesSplit(n_splits=5)
 
-# Set up GridSearchCV 
+# Multi-metric scoring
+scoring = {
+    'rmse': 'neg_root_mean_squared_error',
+    'mae': make_scorer(mean_absolute_error, greater_is_better=False),
+    'mape': make_scorer(mean_absolute_percentage_error, greater_is_better=False),
+    'sd': make_scorer(lambda y, y_pred: np.std(y - y_pred), greater_is_better=False)
+}
+
+# GridSearchCV
 gs = GridSearchCV(
     estimator=KNNModel(),
     param_grid=param_grid,
     cv=tscv,
-    scoring='neg_root_mean_squared_error',  # sklearn maximizes, so negative RMSE
-    return_train_score=True,                # also record train scores
-    n_jobs=-1,                              # parallelize across all CPUs
-    verbose=3,                              # show progress
-    refit=True                              # retrain best model on full train
+    scoring=scoring,
+    return_train_score=False,
+    n_jobs=-1,
+    verbose=3,
+    refit='rmse'
 )
 
-# Run the grid search 
-start = time.perf_counter() # Measure the time to fit the model with all parameter combinations
+# Run search
+print("Running GridSearchCV for KNNModel...")
+start = time.perf_counter()
 gs.fit(X_trval, y_trval)
 print(f'GridSearchCV done in {time.perf_counter() - start:.1f}s')
 
-# Retrieve the best model and its parameters
+# Best model and params
 best_model = gs.best_estimator_
 best_params = gs.best_params_
 
-
-# Evaluate on the test set
+# Test set prediction
 t0 = time.perf_counter()
 y_pred = best_model.predict(X_test)
 pred_time = time.perf_counter() - t0
 
-# Compute holdout metrics
+# Test metrics
 holdout_metrics = best_model.evaluate(X_test, y_test)
 holdout_metrics.update({
     'test_pred_time_s': round(pred_time, 4),
     'params': best_params
 })
 
+# Cross-validation metrics
+idx = gs.best_index_
+cv_results = gs.cv_results_
+cv_metrics = {
+    'cv_rmse': round(-cv_results['mean_test_rmse'][idx], 3),
+    'cv_mae':  round(-cv_results['mean_test_mae'][idx], 3),
+    'cv_mape': round(-cv_results['mean_test_mape'][idx], 3),
+    'cv_sd':   round(-cv_results['mean_test_sd'][idx], 3)
+}
+holdout_metrics.update(cv_metrics)
 
-# Create model output directory
-model_dir = os.path.join('outputs', 'experiments', exp_name, 'metrics')
-os.makedirs(model_dir, exist_ok=True)
+# Save all outputs
+model_path = os.path.join(exp_metrics, 'best_model.pkl')
+params_path = os.path.join(exp_metrics, 'best_model_params.json')
+metrics_path = os.path.join(exp_metrics, 'best_model_metrics.json')
 
-# Save trained model
-model_path = os.path.join(model_dir, 'best_model.pkl')
 best_model.save(model_path)
 
-# Save best hyperparameters
-params_path = os.path.join(model_dir, 'best_model_params.json')
 with open(params_path, 'w') as f:
     json.dump(best_params, f, indent=2)
 
-# Save test set metrics
-metrics_path = os.path.join(model_dir, 'best_model_metrics.json')
 with open(metrics_path, 'w') as f:
     json.dump(holdout_metrics, f, indent=2)
 
-print(f' Best model saved to: {model_path}')
-print(f' Params saved to:     {params_path}')
-print(f' Test metrics saved to: {metrics_path}')
+print(f' Best model saved to:    {model_path}')
+print(f' Params saved to:        {params_path}')
+print(f' Metrics saved to:       {metrics_path}')

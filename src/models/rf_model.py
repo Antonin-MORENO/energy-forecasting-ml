@@ -42,7 +42,10 @@ class RandomForestModel(BaseModel, BaseEstimator, RegressorMixin):
             min_samples_split=min_samples_split,
             min_samples_leaf=min_samples_leaf,
             random_state=random_state,
-            max_features=max_features
+            max_features=max_features,
+            verbose=3,         
+            n_jobs=-1  
+            
         )
 
     def fit(self, X_train, y_train, X_val=None, y_val=None):

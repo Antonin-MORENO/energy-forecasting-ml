@@ -76,6 +76,7 @@ class LSTMModel(BaseModel):
                     filepath=p['checkpoint_path'],
                     monitor='val_loss',
                     save_best_only=True,
+                    save_weights_only=False,
                     verbose=1
                 )
             )

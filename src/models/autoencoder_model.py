@@ -31,37 +31,27 @@ class AutoEncoderModel(BaseModel):
         # Input layer
         inp = Input(shape=(inp_dim,), name='ae_input')
 
-        # Hidden layer 1: 128 neurons
-        x = Dense(128, activation=None, name='enc_dense_1')(inp)
+        # Hidden layer 1: 32 neurons
+        x = Dense(32, activation=None, name='enc_dense_1')(inp)
         x = BatchNormalization(name='enc_bn_1')(x)
         x = Activation('relu', name='enc_act_1')(x)
 
-        # Hidden layer 2: 64 neurons
-        x = Dense(64, activation=None, name='enc_dense_2')(x)
+        # Hidden layer 2: 16 neurons
+        x = Dense(16, activation=None, name='enc_dense_2')(x)
         x = BatchNormalization(name='enc_bn_2')(x)
         x = Activation('relu', name='enc_act_2')(x)
 
-        # Hidden layer 3: 16 neurons
-        x = Dense(16, activation=None, name='enc_dense_3')(x)
-        x = BatchNormalization(name='enc_bn_3')(x)
-        x = Activation('relu', name='enc_act_3')(x)
+        # Bottleneck: 8 neurons (the compressed representation)
+        bottleneck = Dense(8, activation='relu', name='bottleneck')(x)
 
-        # Bottleneck: 7 neurons (the compressed representation)
-        bottleneck = Dense(7, activation='relu', name='bottleneck')(x)
 
-        # --- Symmetrical Explicit Decoder ---
-        # Decoder reconstruction layer 1: 16 neurons
-        x = Dense(16, activation=None, name='dec_dense_1')(bottleneck)
-        x = BatchNormalization(name='dec_bn_1')(x)
-        x = Activation('relu', name='dec_act_1')(x)
-
-        # Decoder reconstruction layer 2: 64 neurons
-        x = Dense(64, activation=None, name='dec_dense_2')(x)
+        # Decoder reconstruction layer 2: 16 neurons
+        x = Dense(16, activation=None, name='dec_dense_2')(x)
         x = BatchNormalization(name='dec_bn_2')(x)
         x = Activation('relu', name='dec_act_2')(x)
 
-        # Decoder reconstruction layer 3: 128 neurons
-        x = Dense(128, activation=None, name='dec_dense_3')(x)
+        # Decoder reconstruction layer 3: 32 neurons
+        x = Dense(32, activation=None, name='dec_dense_3')(x)
         x = BatchNormalization(name='dec_bn_3')(x)
         x = Activation('relu', name='dec_act_3')(x)
 

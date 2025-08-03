@@ -1,18 +1,18 @@
 import os
 import time
 import json
+import matplotlib.pyplot as plt
 import numpy as np
 import joblib
-import matplotlib.pyplot as plt
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from src.data.data_handler import DataHandler
-from src.models.lstm_model import LSTMModel
+from src.models.cnn_model import CNNModel
 
 # ---------------------- Configuration ----------------------
 
-exp_name = 'lstm_all_lags_experiment_save1'
+exp_name = 'cnn_all_lags_experiment_save1'
 base_dir = os.path.join('outputs', 'experiments', exp_name)
 metrics_dir = os.path.join(base_dir, 'metrics')
 fig_dir = os.path.join(base_dir, 'figures')
@@ -44,9 +44,10 @@ dh = DataHandler(
     no_scale_cols=no_scale_cols,
     holdout_ratio=None,
     holdout_years=1,
-    scaler_type='minmax'
+    scaler_type='standard'
 )
 
+# For CV (full trainval set, no test split)
 X_seq_all, X_stat_all, y_all, _, _, _, _, _, _ = dh.get_sequence_data(val_years=0)
 
 # ---------------------- 5-Fold Cross-Validation ----------------------
@@ -64,10 +65,12 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(X_seq_all)):
     X_train_dict = {'seq_input': X_tr_seq, 'static_input': X_tr_stat}
     X_val_dict   = {'seq_input': X_val_seq, 'static_input': X_val_stat}
 
-    model = LSTMModel({
+    model = CNNModel({
         'input_shape_seq': X_tr_seq.shape[1:], 
         'input_shape_stat': X_tr_stat.shape[1],
-        'lstm_units': 64,
+        'filters': 64,
+        'kernel_size': 3,
+        'pool_size': 2,
         'dense_units': 128,
         'optimizer': 'adam',
         'loss': 'mse',
@@ -77,8 +80,7 @@ for fold, (train_idx, val_idx) in enumerate(tscv.split(X_seq_all)):
         'early_stop_patience': 10,
         'checkpoint_path': None,
         'verbose': 0,
-        'scale_y': True,
-        'scale_mode' : 'standard'  
+        'scale_y': True
     })
 
     model.fit(X_train_dict, y_tr, X_val=X_val_dict, y_val=y_val)
@@ -101,12 +103,15 @@ print("\nAverage CV metrics:", cv_summary)
 
 # ---------------------- Final Training & Test Evaluation ----------------------
 
+# Split for final training and test
 X_seq_tr, X_stat_tr, y_tr, X_seq_val, X_stat_val, y_val, X_seq_te, X_stat_te, y_te = dh.get_sequence_data(val_years=1)
 
 params = {
     'input_shape_seq': X_seq_tr.shape[1:], 
     'input_shape_stat': X_stat_tr.shape[1],
-    'lstm_units': 64,
+    'filters': 64,
+    'kernel_size': 3,
+    'pool_size': 2,
     'dense_units': 128,
     'optimizer': 'adam',
     'loss': 'mse',
@@ -114,27 +119,26 @@ params = {
     'epochs': 200,
     'batch_size': 32,
     'early_stop_patience': 10,
-    'checkpoint_path': os.path.join(base_dir, 'models', 'best_lstm.keras'),
+    'checkpoint_path': os.path.join(base_dir, 'models', 'best_cnn.keras'),
     'verbose': 1,
-    'scale_y': True,
-    'scale_mode' : 'standard'  
+    'scale_y': True
 }
 
-lstm = LSTMModel(params)
+cnn = CNNModel(params)
 
 X_train_dict = {'seq_input': X_seq_tr, 'static_input': X_stat_tr}
 X_val_dict   = {'seq_input': X_seq_val, 'static_input': X_stat_val}
 X_test_dict  = {'seq_input': X_seq_te,  'static_input': X_stat_te}
 
 # Final training
-start = time.perf_counter()
-history = lstm.fit(X_train_dict, y_tr, X_val=X_val_dict, y_val=y_val)
-train_time = time.perf_counter() - start
+t0 = time.perf_counter()
+history = cnn.fit(X_train_dict, y_tr, X_val=X_val_dict, y_val=y_val)
+train_time = time.perf_counter() - t0
 
-# Test prediction
-start = time.perf_counter()
-preds = lstm.predict(X_test_dict)
-pred_time = time.perf_counter() - start
+# Prediction on test set
+t0 = time.perf_counter()
+preds = cnn.predict(X_test_dict)
+pred_time = time.perf_counter() - t0
 
 errors = preds - y_te
 metrics = {
@@ -155,11 +159,13 @@ with open(os.path.join(metrics_dir, 'holdout_metrics.json'), 'w') as f:
 with open(os.path.join(metrics_dir, 'training_history.json'), 'w') as f:
     json.dump(history.history, f, indent=2)
 
-joblib.dump(lstm.y_scaler, os.path.join(base_dir, 'y_scaler.pkl'))
+scaler_path = os.path.join(base_dir, 'y_scaler.pkl')
+joblib.dump(cnn.y_scaler, scaler_path)
 
+# Plot learning curves
 plt.figure()
-plt.plot(history.history['loss'], label='train_mse')
-plt.plot(history.history['val_loss'], label='val_mse')
+plt.plot(history.history['loss'],    label='train_mse')
+plt.plot(history.history['val_loss'],label='val_mse')
 plt.title('MSE per epoch')
 plt.xlabel('Epoch')
 plt.ylabel('MSE')
@@ -168,7 +174,7 @@ plt.savefig(os.path.join(fig_dir, 'mse_curve.png'))
 plt.close()
 
 plt.figure()
-plt.plot(history.history['mae'], label='train_mae')
+plt.plot(history.history['mae'],     label='train_mae')
 plt.plot(history.history['val_mae'], label='val_mae')
 plt.title('MAE per epoch')
 plt.xlabel('Epoch')

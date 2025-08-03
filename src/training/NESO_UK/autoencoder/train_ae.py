@@ -9,7 +9,7 @@ from src.models.autoencoder_model import AutoEncoderModel
 # --- Configuration ---
 
 # Experiment name and directory setup
-exp_name    = 'ae_smooth_funnel_32'
+exp_name    = 'ae_smooth_funnel_8_stat'
 base_dir    = os.path.join('outputs', 'experiments', exp_name)
 metrics_dir = os.path.join(base_dir, 'metrics')
 fig_dir     = os.path.join(base_dir, 'figures')
@@ -51,34 +51,25 @@ dh = DataHandler(
 )
 
 # Load the data and perform a time-based split for the test set
-df = dh.load_data()
-df_trainval, df_test = dh.temporal_split(df)
-
-# Scale features and separate features (X) from the target (y)
-X_trval, y_trval, X_test, y_test = dh.scale_split(df_trainval, df_test)
+X_seq_tr, X_stat_tr, y_tr, X_seq_val, X_stat_val, y_val, X_seq_te, X_stat_te, y_te = \
+    dh.get_sequence_data(val_years=1)
 
 # --- Manual Train/Validation Split ---
 
-# Split the training+validation set into a final training set and a validation set
-n = X_trval.shape[0]
-split_idx = int(n * 0.9)  # 90% for training, 10% for validation
-X_train, X_val = X_trval[:split_idx], X_trval[split_idx:]
-y_train, y_val = y_trval[:split_idx], y_trval[split_idx:] # y is kept for completeness but not used by the autoencoder
 
-# --- Model Configuration ---
 
 # Define hyperparameters for the autoencoder model
 params = {
-    'input_shape': X_train.shape[1],
+    'input_shape': X_stat_tr.shape[1],              # only static features
     'epochs': 200,
     'batch_size': 64,
     'early_stop_patience': 10,
-    'checkpoint_path': os.path.join(ckpt_dir, 'smooth_funnel_ae.keras'),
+    'checkpoint_path': os.path.join(ckpt_dir, 'ae_static.keras'),
     'optimizer': 'adam',
     'loss': 'mse',
     'metrics': ['mae']
 }
-
+print(X_stat_tr.shape[1])
 # Instantiate the autoencoder model
 ae = AutoEncoderModel(params)
 
@@ -86,15 +77,15 @@ ae = AutoEncoderModel(params)
 
 print("Starting model training...")
 t0      = time.perf_counter()
-history = ae.fit(X_train, X_val=X_val) # Train the model
+history = ae.fit(X_stat_tr, X_val=X_stat_val) # Train the model
 train_s = time.perf_counter() - t0
 print(f"Training finished in {train_s:.2f} seconds.")
 
 # --- Evaluation on Test Set ---
 
 # Reconstruct the test set features using the trained autoencoder
-X_recon = ae.predict(X_test)
-errors  = X_test - X_recon
+X_recon = ae.predict(X_stat_te)
+errors  = X_stat_te - X_recon
 mse     = np.mean(errors**2)
 mae     = np.mean(np.abs(errors))
 
@@ -139,9 +130,9 @@ plt.close()
 
 # Visualize the comparison between original and reconstructed feature vectors for a few samples
 n_samples_viz = 5
-for i in range(min(n_samples_viz, X_test.shape[0])):
+for i in range(min(n_samples_viz, X_stat_te.shape[0])):
     plt.figure(figsize=(10, 4))
-    data = np.vstack([X_test[i], X_recon[i]])
+    data = np.vstack([X_stat_te[i], X_recon[i]])
     im = plt.imshow(data, aspect='auto', cmap='viridis')
     plt.colorbar(im, label='Value (scaled)')
     plt.yticks([0, 1], ['Input', 'Reconstruction'])

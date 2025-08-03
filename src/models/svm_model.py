@@ -44,7 +44,9 @@ class SVMModel(BaseModel, BaseEstimator, RegressorMixin):
             C=C,
             kernel=kernel,
             gamma=gamma,
-            epsilon=epsilon
+            epsilon=epsilon,
+            verbose=1
+
         )
 
     def fit(self, X_train, y_train, X_val=None, y_val=None):
